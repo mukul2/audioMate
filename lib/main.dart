@@ -492,7 +492,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 return  ListView.builder(shrinkWrap: true,
                     itemCount: snapshot.data!.docs.length,
                     itemBuilder: (BuildContext context, int index) {
-                   return ListTile(leading: AudioPlayerWidgetLiveAudio(file: snapshot.data!.docs[index].get("link"),),trailing: IconButton(icon: Icon(Icons.download),onPressed: () async {
+                   return ListTile(onTap: () async {
+
+
+                     var url = Uri.parse(snapshot.data!.docs[index].get("link"));
+                     var response = await http.get(url);
+                     Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+                     String appDocumentsPath = appDocumentsDirectory.path; // 2
+                     String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName");
+                     File file = File(filePath);
+                     await file.writeAsBytes(response.bodyBytes);
+                     _listofFiles();
+
+                     Navigator.push(
+                       context,
+                       MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: file.path,)),
+                     );
+
+
+                   },leading: AudioPlayerWidgetLiveAudio(file: snapshot.data!.docs[index].get("link"),),trailing: IconButton(icon: Icon(Icons.download),onPressed: () async {
                      var url = Uri.parse(snapshot.data!.docs[index].get("link"));
                      var response = await http.get(url);
                      Directory appDocumentsDirectory = await getApplicationDocumentsDirectory(); // 1
@@ -1418,8 +1436,10 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
       if(int.parse(sec_)<10)sec_ = "0"+sec_;
       return min_+":"+sec_;
     }
-    return  Column(
+    return   Column(
       children: [
+        Container(height: 60,child: Center(child: Text("Playback",style: TextStyle(fontSize: 18,color: Colors.black,fontWeight: FontWeight.bold),)),),
+        Container(height: 0.5,color: Colors.black,),
         Container(height: 300,width: MediaQuery.of(context).size.width,child: Stack(
           children: [
             Align(alignment: Alignment.center,child: widget.grap,),
@@ -1429,7 +1449,7 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
                   builder: (context, snapshot) {
                     if(snapshot.hasData){
                       if(snapshot.data == durationSecond)return   LinearProgressIndicator(minHeight: 300,color: Colors.blue.withOpacity(0.5),value: 0,);
-                    else  return LinearProgressIndicator(minHeight: 300,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inSeconds/durationSecond,);
+                      else  return LinearProgressIndicator(minHeight: 300,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inMilliseconds/(durationSecond*1000),);
                       return Text(snapshot.data!.inSeconds.toString());
 
                     }else{
@@ -1487,29 +1507,36 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
                       }
 
                     }),),),
+                Column(mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.file.split('/').last),
+                    Text(getMinute(durationSecond)),
+                  ],
+                )
 
 
-        // StreamBuilder<Duration>(
-        // stream:  widget.advancedPlayer.onAudioPositionChanged,
-        // builder: (context, snapshot) {
-        // if(snapshot.hasData){
-        //   return Padding(
-        //     padding: const EdgeInsets.all(8.0),
-        //     child: Slider(min: 0.0,
-        //       max: 100.0,value: (100*snapshot.data!.inSeconds)/durationSecond,onChanged: (val){
-        //         setState(() {
-        //           currrentPosition =( (val*durationSecond) as int)*100;
-        //         });
-        //
-        //       },),
-        //   );
-        //   return Text(snapshot.data!.inSeconds.toString());
-        //
-        // }else{
-        //   return Text("Wait");
-        // }
-        //
-        // }),
+                // StreamBuilder<Duration>(
+                // stream:  widget.advancedPlayer.onAudioPositionChanged,
+                // builder: (context, snapshot) {
+                // if(snapshot.hasData){
+                //   return Padding(
+                //     padding: const EdgeInsets.all(8.0),
+                //     child: Slider(min: 0.0,
+                //       max: 100.0,value: (100*snapshot.data!.inSeconds)/durationSecond,onChanged: (val){
+                //         setState(() {
+                //           currrentPosition =( (val*durationSecond) as int)*100;
+                //         });
+                //
+                //       },),
+                //   );
+                //   return Text(snapshot.data!.inSeconds.toString());
+                //
+                // }else{
+                //   return Text("Wait");
+                // }
+                //
+                // }),
 
 
               ],
