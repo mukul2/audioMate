@@ -20,6 +20,9 @@ import 'package:path_provider/path_provider.dart';
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Color(0xFF4A235A)
+  ));
   runApp(const MyApp());
 }
 double appbarHeight = 0;
@@ -29,9 +32,22 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp(debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
-      theme: ThemeData(
+      theme: ThemeData(scaffoldBackgroundColor: const Color(0xFF4A235A),appBarTheme: AppBarTheme(elevation: 1,
+        backgroundColor: Color(0xFF4A235A),
+      ),
+        textTheme:Theme.of(context).textTheme.apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
+        ) ,
+        inputDecorationTheme: InputDecorationTheme(hintStyle: TextStyle(color: Colors.white),border: OutlineInputBorder(borderSide:BorderSide(color: Colors.white,width: 0.0 ) ),enabledBorder: const OutlineInputBorder(
+          // width: 0.0 produces a thin "hairline" border
+          borderSide: const BorderSide(color: Colors.white, width: 0.0),
+        ),),
+
+
+
         // This is the theme of your application.
         //
         // Try running your application with "flutter run". You'll see the
@@ -41,9 +57,10 @@ class MyApp extends StatelessWidget {
         // or simply save your changes to "hot reload" in a Flutter IDE).
         // Notice that the counter didn't reset back to zero; the application
         // is not restarted.
-        primarySwatch: Colors.blue,
+        primaryColor: Colors.white,
+        accentColor: Colors.white
       ),
-      home: Container(color: Colors.white,child: SafeArea(child: Scaffold(body: StreamBuilder(
+      home:Container(color: Colors.white,child: SafeArea(child: Scaffold(body: StreamBuilder(
           stream: UserLoggedInStream.getInstance().outData,
           builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
             print("auth changed");
@@ -88,7 +105,7 @@ class MyApp extends StatelessWidget {
                     //   firestore: _firestore,
                     // );
 
-                    return MyHomePage();
+                    return true?AllProjectsHome():MyHomePage();
 
                   }
                   return Scaffold(body: Center(child: Text("Please wait"),),);
@@ -101,6 +118,76 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+class AllProjectsHome extends StatefulWidget {
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  FirebaseAuth auth = FirebaseAuth.instance;
+   AllProjectsHome({Key? key}) : super(key: key);
+
+  @override
+  _AllProjectsHomeState createState() => _AllProjectsHomeState();
+}
+
+class _AllProjectsHomeState extends State<AllProjectsHome> {
+  double width = 0;
+  @override
+  Widget build(BuildContext context) {
+    width =  MediaQuery.of(context).size.width;
+    return Container(color: Colors.white,
+      child: SafeArea(child: Scaffold(appBar: AppBar(
+        title: Text("Projects"),actions: [
+        IconButton(onPressed: (){
+
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CreateNewProject()),
+          );
+
+        }, icon:Icon(Icons.add)),
+        Container(margin: EdgeInsets.only(right: 15),child: CircleAvatar(backgroundColor: Colors.white,)),
+      ],
+      ),body:StreamBuilder<QuerySnapshot>(
+          stream:widget.firestore.collection("projects").where("uid",isEqualTo: widget.auth.currentUser!.uid).snapshots(),
+          builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+            if(snapshot.hasData){
+              return  ListView.builder(shrinkWrap: true,
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    return InkWell(onTap: (){
+                      //Oneproject
+
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => Oneproject(queryDocumentSnapshot: snapshot.data!.docs[index],)),
+                      );
+
+                    },
+                      child: Container(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(15.0),
+                              child: Text( snapshot.data!.docs[index].get("title"),style: TextStyle(fontSize: 20,fontWeight: FontWeight.bold),),
+                            ),
+                            Container(height: 0.1,width: width,color: Colors.white,),
+
+                          ],
+
+                        ),
+                      ),
+                    );
+                  });
+            }else{
+              return Scaffold(body: Center(child: Text("No Projects"),),);
+            }
+
+          }),)),
+    );
+  }
+}
+
 
 class MyHomePage extends StatefulWidget {
   Record record = Record();
@@ -225,7 +312,7 @@ class _MyHomePageState extends State<MyHomePage> {
     // than having to individually change instances of widgets.
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold( floatingActionButton: FloatingActionButton(
         onPressed: () async {
 
@@ -267,6 +354,12 @@ class _MyHomePageState extends State<MyHomePage> {
         child:  Icon(recording?Icons.stop: Icons.mic),
       ),
         appBar: AppBar(  title: Text("Audio Mate"),actions: [
+          IconButton(onPressed: (){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => MyProjects()),
+            );
+          }, icon: Icon(Icons.work)),
 
           if(false) IconButton(onPressed: () async {
             List<String> filesSt = [];
@@ -387,35 +480,40 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
           bottom: const TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.save)),
-              Tab(icon: Icon(Icons.cloud)),
+              Tab(icon: Icon(Icons.work,),text: "Projects",),
+              Tab(icon: Icon(Icons.save),text: "Saved sounds",),
+              Tab(icon: Icon(Icons.cloud),text: "More Clips",),
             ],
           ),
         ),
         body:   TabBarView(
           children: [
+            MyProjects(),
             Column(
               children: [
-                ListView.builder(shrinkWrap: true,
-                    itemCount: fileBool.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      if(fileBool[index]["path"].endsWith(".mp3"))
-                        return AudioPlayerWidget(file:fileBool[index]["path"] ,selected:fileBool[index]["selected"] ,isSelected: (val){
+
+                Expanded(
+                  child: ListView.builder(shrinkWrap: true,
+                      itemCount: fileBool.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        if(fileBool[index]["path"].endsWith(".mp3"))
+                          return AudioPlayerWidget(file:fileBool[index]["path"] ,selected:fileBool[index]["selected"] ,isSelected: (val){
 
 
-                          fileBool[index]["selected"] = val;
+                            fileBool[index]["selected"] = val;
 
-                          setFiles();
-
-
+                            setFiles();
 
 
-                        });
 
 
-                      //return Text(file[index].path);
-                      else return Container(height: 0,width: 0,);
-                    }),
+                          });
+
+
+                        //return Text(file[index].path);
+                        else return Container(height: 0,width: 0,);
+                      }),
+                ),
                 if(positiveSelectedFiles.length>1) InkWell(onTap: (){
 
                   List<String> filesSt = [];
@@ -504,10 +602,10 @@ class _MyHomePageState extends State<MyHomePage> {
                      await file.writeAsBytes(response.bodyBytes);
                      _listofFiles();
 
-                     Navigator.push(
-                       context,
-                       MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: file.path,)),
-                     );
+                     // Navigator.push(
+                     //   context,
+                     //   MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: file.path,width: MediaQuery.of(context).size.width,)),
+                     // );
 
 
                    },leading: AudioPlayerWidgetLiveAudio(file: snapshot.data!.docs[index].get("link"),),trailing: IconButton(icon: Icon(Icons.download),onPressed: () async {
@@ -789,6 +887,84 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
+class MyProjects extends StatefulWidget {
+  const MyProjects({Key? key}) : super(key: key);
+
+  @override
+  _MyProjectsState createState() => _MyProjectsState();
+}
+
+class _MyProjectsState extends State<MyProjects> {
+  @override
+  Widget build(BuildContext context) {
+    return Container(color: Colors.white,child: SafeArea(
+      child:Scaffold(floatingActionButton: FloatingActionButton.extended(onPressed: (){
+         Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => CreateNewProject()),
+            );
+
+
+      }, label: Text("Create Project"),icon: Icon(Icons.add),),
+      body: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Column(
+        children: [
+          
+
+
+    ],
+    ),
+      ),
+    )
+    ),);
+  }
+}
+
+class CreateNewProject extends StatefulWidget {
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  FirebaseAuth auth = FirebaseAuth.instance;
+   CreateNewProject({Key? key}) : super(key: key);
+
+  @override
+  _CreateNewProjectState createState() => _CreateNewProjectState();
+}
+
+class _CreateNewProjectState extends State<CreateNewProject> {
+  TextEditingController controller = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    return Container(child: SafeArea(child: Scaffold(appBar: AppBar(title: Text("Create Project"),),
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Container(margin: EdgeInsets.only(top: 20),
+              child: TextFormField(controller: controller,
+
+              ),
+            ),
+            InkWell(onTap: (){
+              if(controller.text.length>0){
+                widget.firestore.collection("projects").add({"time":DateTime.now().millisecondsSinceEpoch,"title":controller.text,"uid":widget.auth.currentUser!.uid});
+                Navigator.pop(context);
+              }
+
+            },
+              child: Container(margin: EdgeInsets.only(top: 15,bottom: 15),height: 55,decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(5)
+              ),child: Center(child:Text("Create",style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 17),),),),
+            ),
+
+          ],
+        ),
+      ),
+    ),),);
+  }
+}
+
+
 
 class AudioPlayerWidget extends StatefulWidget {
   String file;
@@ -847,10 +1023,10 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
     }
 
     return ListTile(onTap: (){
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: widget.file,)),
-      );
+      // Navigator.push(
+      //   context,
+      //   MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: widget.file,width: MediaQuery.of(context).size.width)),
+      // );
 
     },subtitle: Text(getMinute(durationSecond)),leading: Checkbox(value: widget.selected,onChanged: (val){
       //setState(() {
@@ -939,10 +1115,16 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
 
 class SingleAudioPlayer extends StatefulWidget {
   String link;
-  SingleAudioPlayer({required this.link});
+  String wave;
+  double width;
+  SingleAudioPlayer({required this.wave,required this.link,required this.width});
+  AudioPlayer advancedPlayer = AudioPlayer();
+  bool isPlaying = false;
   int progress = 0 ;
 
   bool isReady = false;
+
+  double currrentPositionLeftOffset =20;
 
   @override
   _SingleAudioPlayerState createState() => _SingleAudioPlayerState();
@@ -958,33 +1140,72 @@ class _SingleAudioPlayerState extends State<SingleAudioPlayer> {
     // TODO: implement initState
     super.initState();
     prepareData();
+    playerStateManagement();
+
     //initAudio(filePath: widget.file);
   }
-  prepareData() async {
-    String path =await localPath();
-     waveFile = path+"/"+DateTime.now().millisecondsSinceEpoch.toString()+'waveform.wave';
-    print(waveFile);
+  void playerStateManagement() {
+    widget.width =  widget.width-40;
+    print("width "+widget.width.toString());
 
-     progressStream = JustWaveform.extract(
-      audioInFile: File(widget.link),
-      waveOutFile: File(waveFile),
-      zoom: const WaveformZoom.pixelsPerSecond(100),
-    );
-    progressStream.listen((waveformProgress) {
-      setState(() {
-        widget.progress = (100 * waveformProgress.progress).toInt();
+    widget.advancedPlayer.setUrl(widget.link).then((value) {
+
+
+      widget.advancedPlayer.onDurationChanged.listen((Duration d) {
+        print('Max duration: $d');
+        if(mounted) setState(() { durationMillis = d.inMilliseconds;});
       });
-      print('Progress: %${(100 * waveformProgress.progress).toInt()}');
-      if (waveformProgress.waveform != null) {
 
-        waveform = waveformProgress.waveform;
-        // Use the waveform.
-        print("use waveform");
-        setState(() {
-          widget.isReady = true ;
-        });
-      }
+
+      widget.advancedPlayer.onAudioPositionChanged.listen((Duration  p) => {
+
+        if(mounted) setState(() {
+          currrentPosition = p.inSeconds;
+          int  currentPosInMillis = p.inMilliseconds;
+
+          widget.currrentPositionLeftOffset =20+(widget.width)*(((((currentPosInMillis)*1))/(durationMillis)));
+          print("calculated offset "+widget.currrentPositionLeftOffset.toString());
+
+
+
+
+        })
+      });
+
+      // widget.advancedPlayer.getDuration().then((value) {
+
+
+
+
+      // setState(() {
+      //   durationSecond = value;
+      // });
+      // widget.advancedPlayer.onAudioPositionChanged.listen((Duration  p) => {
+      //     setState(() => durationSecond = p.inSeconds)
+      // });
+
+
+      // });
     });
+
+  }
+  //int durationSecond = 0 ;
+  int durationMillis = 0 ;
+  int currrentPosition = 0 ;
+
+  initAudio({required String filePath}) async {
+
+    //final file = File(filePath);
+    //widget.advancedPlayer.play(file.path);
+
+  }
+  prepareData() async {
+
+    waveform = await JustWaveform.parse(File(widget.wave));
+    setState(() {
+      widget.isReady = true ;
+    });
+
   //  final FlutterFFmpeg _flutterFFmpeg = new FlutterFFmpeg();
    // _flutterFFmpeg.execute("ffmpeg -i input -filter_complex 'showwavespic=s=640x120' -frames:v 1 output.png").then((rc) => print("FFmpeg process exited with rc $rc"));
     // var url = Uri.parse(widget.link);
@@ -998,9 +1219,10 @@ class _SingleAudioPlayerState extends State<SingleAudioPlayer> {
   }
   @override
   Widget build(BuildContext context) {
+    double width = MediaQuery.of(context).size.width;
     showImage(){
 
-    return  Container(height: 300,width: MediaQuery.of(context).size.width,
+    return  Container(height: 90,width: MediaQuery.of(context).size.width,
       child: AudioWaveformWidget(
           waveform: waveform,
           start: Duration.zero,
@@ -1009,19 +1231,648 @@ class _SingleAudioPlayerState extends State<SingleAudioPlayer> {
     );
 
     }
-
+    String  getMinute(int min){
+      String min_ = "";
+      String sec_ = "";
+      min_ = (min/60).toInt().toString();
+      sec_ = (min%60).toInt().toString();
+      if(int.parse(min_)<10)min_ = "0"+min_;
+      if(int.parse(sec_)<10)sec_ = "0"+sec_;
+      return min_+":"+sec_;
+    }
      Text("ok");
+    return WillPopScope (
+      onWillPop: () async {
+    return true;
+    },
+      child:SafeArea(child: Scaffold(appBar: AppBar(),body: Stack(
+        children: [
+          Align(alignment: Alignment.center,child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(10,),),
+            margin: EdgeInsets.all(0),height: 125,
+        child: Stack(children: [
+          Align(alignment: Alignment.center,child:widget.isReady?Container(margin: EdgeInsets.only(top: 0,left: 20,right: 20),child: showImage(),):Container(child:Center(child: CircularProgressIndicator())  ,) ,),
 
+
+          Align(alignment: Alignment.center,child: Opacity(opacity: 0.3,
+            child: Container(margin: EdgeInsets.only(top: 0,left: 20,right: 20),
+              child: StreamBuilder<Duration>(
+                  stream:  widget.advancedPlayer.onAudioPositionChanged,
+                  builder: (context, snapshot) {
+                    if(snapshot.hasData){
+                      if(snapshot.data == durationMillis)return   Container(
+
+                        width: width,
+                        height: 125,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          child: LinearProgressIndicator(
+                            value: 0,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                0x22ff0000)),
+                            backgroundColor: Color(0xffD6D6D6),
+                          ),
+                        ),
+                      );
+                      else  return  Container(
+
+                        width: width,
+                        height: 125,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          child: LinearProgressIndicator(
+                            value: snapshot.data!.inMilliseconds/(durationMillis),
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                0x22ff0000)),
+                            backgroundColor: Color(0xffD6D6D6),
+                          ),
+                        ),
+                      );
+                      // else  return LinearProgressIndicator(minHeight: 100,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inMilliseconds/(durationSecond*1000),);
+                      return Text(snapshot.data!.inSeconds.toString());
+
+                    }else{
+                      return Container(
+
+                        width: width,
+                        height: 125,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          child: LinearProgressIndicator(
+                            value: 0,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                0x22ff0000)),
+                            backgroundColor: Color(0xffD6D6D6),
+                          ),
+                        ),
+                      );
+                    }
+
+                  }),
+            ),
+          ) ,),
+
+        ],),
+      ) ,),
+         
+          Align(alignment: Alignment.bottomCenter,child: Container(margin: EdgeInsets.only(bottom: 15),child:Card(elevation: 5,color: Colors.blue,shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30.0),
+          ),child: Container(width: 60,height: 60,child: Center(child: StreamBuilder<PlayerState>(
+              stream: widget. advancedPlayer.onPlayerStateChanged,
+              builder: (context, snapshot) {
+                if(snapshot.hasData){
+                  if(snapshot.data == PlayerState.PLAYING){
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.pause();
+                    }, icon: Icon(Icons.pause,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.COMPLETED){
+                    widget.advancedPlayer.stop();
+
+                    currrentPosition = 0;
+
+
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.play(widget.link);
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.PAUSED){
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.resume();
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.STOPPED){
+
+                    currrentPosition = 0;
+
+
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.resume();
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else{
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.play(widget.link);
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }
+
+                }else{
+                  return IconButton(onPressed: (){
+                    widget.advancedPlayer.play(widget.link);
+                  }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+
+                }
+
+              }),),),) ,),),
+          Align(alignment: Alignment.center,child: Container(margin: EdgeInsets.only(bottom: 35),height: 160,
+            child: Stack(
+              children: [
+                Positioned(left:widget.currrentPositionLeftOffset-25,child: Container(width: 50,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Center(child: Text(getMinute(currrentPosition))),
+                      CircleAvatar(radius: 7,backgroundColor: Colors.white,),
+                      Container(  height: 170,width: 4,color: Colors.white,)
+                    ],
+                  ),
+                ),),
+              ],
+            ),
+          ),),
+
+          // Container(width: MediaQuery.of(context).size.width,height: 60,
+          //   child: Center(
+          //     child: Row(
+          //       children: [
+          //         Container(width: 60,height: 60,child: Center(child: StreamBuilder<PlayerState>(
+          //             stream: widget. advancedPlayer.onPlayerStateChanged,
+          //             builder: (context, snapshot) {
+          //               if(snapshot.hasData){
+          //                 if(snapshot.data == PlayerState.PLAYING){
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.pause();
+          //                   }, icon: Icon(Icons.pause));
+          //                 }else if(snapshot.data == PlayerState.COMPLETED){
+          //                   widget.advancedPlayer.stop();
+          //
+          //                   currrentPosition = 0;
+          //
+          //
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.play(widget.link);
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else if(snapshot.data == PlayerState.PAUSED){
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.resume();
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else if(snapshot.data == PlayerState.STOPPED){
+          //
+          //                   currrentPosition = 0;
+          //
+          //
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.resume();
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else{
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.play(widget.link);
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }
+          //
+          //               }else{
+          //                 return IconButton(onPressed: (){
+          //                   widget.advancedPlayer.play(widget.link);
+          //                 }, icon: Icon(Icons.play_arrow));
+          //
+          //               }
+          //
+          //             }),),),
+          //         Column(mainAxisAlignment: MainAxisAlignment.center,
+          //           crossAxisAlignment: CrossAxisAlignment.start,
+          //           children: [
+          //             Text(widget.link.split('/').last),
+          //             Text(getMinute(durationSecond)),
+          //           ],
+          //         )
+          //
+          //
+          //         // StreamBuilder<Duration>(
+          //         // stream:  widget.advancedPlayer.onAudioPositionChanged,
+          //         // builder: (context, snapshot) {
+          //         // if(snapshot.hasData){
+          //         //   return Padding(
+          //         //     padding: const EdgeInsets.all(8.0),
+          //         //     child: Slider(min: 0.0,
+          //         //       max: 100.0,value: (100*snapshot.data!.inSeconds)/durationSecond,onChanged: (val){
+          //         //         setState(() {
+          //         //           currrentPosition =( (val*durationSecond) as int)*100;
+          //         //         });
+          //         //
+          //         //       },),
+          //         //   );
+          //         //   return Text(snapshot.data!.inSeconds.toString());
+          //         //
+          //         // }else{
+          //         //   return Text("Wait");
+          //         // }
+          //         //
+          //         // }),
+          //
+          //
+          //       ],
+          //     ),
+          //   ),
+          // ),
+         // AudioPlayerWidgetButtonOnly(file: widget.link,),
+        ],
+      ),)) ,
+    );
+          //&& snapshot.connectionState == ConnectionState.active
+    // Center(
+    //   child: StreamBuilder<WaveformProgress>(
+    //       stream: progressStream.listen,
+    //       builder: (BuildContext context, AsyncSnapshot<WaveformProgress> snapshot) {
+    //         if(snapshot.hasData){
+    //           return Text( (100 * snapshot.data!.progress).toInt().toString());
+    //         }else{
+    //           return Container(height: 0,width: 0,);
+    //         }
+    //       }),
+    // );
 
     //ffmpeg -i input -filter_complex "showwavespic=s=640x120" -frames:v 1 output.png
-    return SafeArea(child: Scaffold(body: Column(
-      children: [
-        
-        AudioPlayerWidgetButtonOnly(file: widget.link,grap: widget.isReady?showImage():Container(height: 0,width: 0,),),
-      ],
-    ),));
+
   }
 }
+
+
+
+class SingleAudioGraph extends StatefulWidget {
+  String link;
+
+  SingleAudioGraph({required this.link});
+  AudioPlayer advancedPlayer = AudioPlayer();
+  bool isPlaying = false;
+  int progress = 0 ;
+
+  bool isReady = false;
+
+  double currrentPositionLeftOffset =20;
+
+
+  @override
+  _SingleAudioGraphState createState() => _SingleAudioGraphState();
+
+}
+
+class _SingleAudioGraphState extends State<SingleAudioGraph> {
+  late Stream<WaveformProgress> progressStream;
+  String waveFile = "";
+  late Waveform waveform;
+  double width = 600;
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    prepareData();
+    playerStateManagement();
+
+    //initAudio(filePath: widget.file);
+  }
+  void playerStateManagement() {
+    width =  width-40;
+    print("width "+width.toString());
+
+    widget.advancedPlayer.setUrl(widget.link).then((value) {
+
+
+      widget.advancedPlayer.onDurationChanged.listen((Duration d) {
+        print('Max duration: $d');
+        if(mounted) setState(() { durationMillis = d.inMilliseconds;});
+      });
+
+
+      widget.advancedPlayer.onAudioPositionChanged.listen((Duration  p) => {
+
+        if(mounted) setState(() {
+          currrentPosition = p.inSeconds;
+          int  currentPosInMillis = p.inMilliseconds;
+
+          widget.currrentPositionLeftOffset =20+(width)*(((((currentPosInMillis)*1))/(durationMillis)));
+          print("calculated offset "+widget.currrentPositionLeftOffset.toString());
+
+
+
+
+        })
+      });
+
+      // widget.advancedPlayer.getDuration().then((value) {
+
+
+
+
+      // setState(() {
+      //   durationSecond = value;
+      // });
+      // widget.advancedPlayer.onAudioPositionChanged.listen((Duration  p) => {
+      //     setState(() => durationSecond = p.inSeconds)
+      // });
+
+
+      // });
+    });
+
+  }
+  //int durationSecond = 0 ;
+  int durationMillis = 0 ;
+  int currrentPosition = 0 ;
+
+  initAudio({required String filePath}) async {
+
+    //final file = File(filePath);
+    //widget.advancedPlayer.play(file.path);
+
+  }
+  prepareData() async {
+    String path =await localPath();
+    waveFile = path+"/"+DateTime.now().millisecondsSinceEpoch.toString()+'waveform.wave';
+    print(waveFile);
+    waveform =  await  JustWaveform.parse(File(widget.link));
+    setState(() {
+      widget.isReady = true ;
+    });
+
+
+    // progressStream = JustWaveform.extract(
+    //   audioInFile: File(widget.link),
+    //   waveOutFile: File(waveFile),
+    //   zoom: const WaveformZoom.pixelsPerSecond(100),
+    // );
+    //
+    //
+    // progressStream.listen((waveformProgress) {
+    //   setState(() {
+    //     widget.progress = (100 * waveformProgress.progress).toInt();
+    //   });
+    //   print('Progress: %${(100 * waveformProgress.progress).toInt()}');
+    //   if (waveformProgress.waveform != null) {
+    //
+    //     waveform = waveformProgress.waveform!;
+    //     // Use the waveform.
+    //     print("use waveform");
+    //     setState(() {
+    //       widget.isReady = true ;
+    //     });
+    //   }
+    // });
+    //  final FlutterFFmpeg _flutterFFmpeg = new FlutterFFmpeg();
+    // _flutterFFmpeg.execute("ffmpeg -i input -filter_complex 'showwavespic=s=640x120' -frames:v 1 output.png").then((rc) => print("FFmpeg process exited with rc $rc"));
+    // var url = Uri.parse(widget.link);
+    // var response = await http.get(url);
+    // Directory appDocumentsDirectory = await getApplicationDocumentsDirectory(); // 1
+    // String appDocumentsPath = appDocumentsDirectory.path; // 2
+    // String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName");
+    // File file = File(filePath);
+    // await file.writeAsBytes(response.bodyBytes);
+
+  }
+  @override
+  Widget build(BuildContext context) {
+    width = MediaQuery.of(context).size.width;
+    showImage(){
+
+      return  Container(height: 70,width: MediaQuery.of(context).size.width,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 5,bottom: 5),
+          child: AudioWaveformWidget(
+            waveform: waveform,
+            start: Duration.zero,
+            duration: waveform.duration,
+          ),
+        ),
+      );
+
+    }
+    String  getMinute(int min){
+      String min_ = "";
+      String sec_ = "";
+      min_ = (min/60).toInt().toString();
+      sec_ = (min%60).toInt().toString();
+      if(int.parse(min_)<10)min_ = "0"+min_;
+      if(int.parse(sec_)<10)sec_ = "0"+sec_;
+      return min_+":"+sec_;
+    }
+    Text("ok");
+    return widget.isReady?Container(margin: EdgeInsets.only(top: 5,left: 20,right: 20),child: Container(decoration: BoxDecoration(color: Colors.redAccent,borderRadius: BorderRadius.circular(5)
+    ),child: showImage(),),):Container(child:Center(child: CircularProgressIndicator())  ,);
+    return WillPopScope (
+      onWillPop: () async {
+        return true;
+      },
+      child:SafeArea(child: Scaffold(appBar: AppBar(),body: Stack(
+        children: [
+          Align(alignment: Alignment.center,child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(10,),),
+            margin: EdgeInsets.all(0),height: 125,
+            child: Stack(children: [
+              Align(alignment: Alignment.bottomCenter,child:
+              widget.isReady?Container(margin: EdgeInsets.only(top: 20,left: 20,right: 20),child: showImage(),):Container(child:Center(child: CircularProgressIndicator())  ,) ,),
+
+
+              Align(alignment: Alignment.bottomCenter,child: Opacity(opacity: 0.3,
+                child: Container(margin: EdgeInsets.only(top: 20,left: 20,right: 20),
+                  child: StreamBuilder<Duration>(
+                      stream:  widget.advancedPlayer.onAudioPositionChanged,
+                      builder: (context, snapshot) {
+                        if(snapshot.hasData){
+                          if(snapshot.data == durationMillis)return   Container(
+
+                            width: width,
+                            height: 100,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.all(Radius.circular(10)),
+                              child: LinearProgressIndicator(
+                                value: 0,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                    0x22ff0000)),
+                                backgroundColor: Color(0xffD6D6D6),
+                              ),
+                            ),
+                          );
+                          else  return  Container(
+
+                            width: width,
+                            height: 100,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.all(Radius.circular(10)),
+                              child: LinearProgressIndicator(
+                                value: snapshot.data!.inMilliseconds/(durationMillis),
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                    0x22ff0000)),
+                                backgroundColor: Color(0xffD6D6D6),
+                              ),
+                            ),
+                          );
+                          // else  return LinearProgressIndicator(minHeight: 100,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inMilliseconds/(durationSecond*1000),);
+                          return Text(snapshot.data!.inSeconds.toString());
+
+                        }else{
+                          return Container(
+
+                            width: width,
+                            height: 100,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.all(Radius.circular(10)),
+                              child: LinearProgressIndicator(
+                                value: 0,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(
+                                    0x22ff0000)),
+                                backgroundColor: Color(0xffD6D6D6),
+                              ),
+                            ),
+                          );
+                        }
+
+                      }),
+                ),
+              ) ,),
+              Positioned(left:widget.currrentPositionLeftOffset-25,child: Container(width: 50,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Center(child: Text(getMinute(currrentPosition))),
+                    CircleAvatar(radius: 5,backgroundColor: Colors.black,),
+                    Container(  height: 130,width: 2,color: Colors.black,)
+                  ],
+                ),
+              ),),
+            ],),
+          ) ,),
+
+          Align(alignment: Alignment.bottomCenter,child: Container(margin: EdgeInsets.only(bottom: 15),child:Card(elevation: 5,color: Colors.blue,shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30.0),
+          ),child: Container(width: 60,height: 60,child: Center(child: StreamBuilder<PlayerState>(
+              stream: widget. advancedPlayer.onPlayerStateChanged,
+              builder: (context, snapshot) {
+                if(snapshot.hasData){
+                  if(snapshot.data == PlayerState.PLAYING){
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.pause();
+                    }, icon: Icon(Icons.pause,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.COMPLETED){
+                    widget.advancedPlayer.stop();
+
+                    currrentPosition = 0;
+
+
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.play(widget.link);
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.PAUSED){
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.resume();
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else if(snapshot.data == PlayerState.STOPPED){
+
+                    currrentPosition = 0;
+
+
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.resume();
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }else{
+                    return IconButton(onPressed: (){
+                      widget.advancedPlayer.play(widget.link);
+                    }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+                  }
+
+                }else{
+                  return IconButton(onPressed: (){
+                    widget.advancedPlayer.play(widget.link);
+                  }, icon: Icon(Icons.play_arrow,color: Colors.white,));
+
+                }
+
+              }),),),) ,),),
+          // Container(width: MediaQuery.of(context).size.width,height: 60,
+          //   child: Center(
+          //     child: Row(
+          //       children: [
+          //         Container(width: 60,height: 60,child: Center(child: StreamBuilder<PlayerState>(
+          //             stream: widget. advancedPlayer.onPlayerStateChanged,
+          //             builder: (context, snapshot) {
+          //               if(snapshot.hasData){
+          //                 if(snapshot.data == PlayerState.PLAYING){
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.pause();
+          //                   }, icon: Icon(Icons.pause));
+          //                 }else if(snapshot.data == PlayerState.COMPLETED){
+          //                   widget.advancedPlayer.stop();
+          //
+          //                   currrentPosition = 0;
+          //
+          //
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.play(widget.link);
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else if(snapshot.data == PlayerState.PAUSED){
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.resume();
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else if(snapshot.data == PlayerState.STOPPED){
+          //
+          //                   currrentPosition = 0;
+          //
+          //
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.resume();
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }else{
+          //                   return IconButton(onPressed: (){
+          //                     widget.advancedPlayer.play(widget.link);
+          //                   }, icon: Icon(Icons.play_arrow));
+          //                 }
+          //
+          //               }else{
+          //                 return IconButton(onPressed: (){
+          //                   widget.advancedPlayer.play(widget.link);
+          //                 }, icon: Icon(Icons.play_arrow));
+          //
+          //               }
+          //
+          //             }),),),
+          //         Column(mainAxisAlignment: MainAxisAlignment.center,
+          //           crossAxisAlignment: CrossAxisAlignment.start,
+          //           children: [
+          //             Text(widget.link.split('/').last),
+          //             Text(getMinute(durationSecond)),
+          //           ],
+          //         )
+          //
+          //
+          //         // StreamBuilder<Duration>(
+          //         // stream:  widget.advancedPlayer.onAudioPositionChanged,
+          //         // builder: (context, snapshot) {
+          //         // if(snapshot.hasData){
+          //         //   return Padding(
+          //         //     padding: const EdgeInsets.all(8.0),
+          //         //     child: Slider(min: 0.0,
+          //         //       max: 100.0,value: (100*snapshot.data!.inSeconds)/durationSecond,onChanged: (val){
+          //         //         setState(() {
+          //         //           currrentPosition =( (val*durationSecond) as int)*100;
+          //         //         });
+          //         //
+          //         //       },),
+          //         //   );
+          //         //   return Text(snapshot.data!.inSeconds.toString());
+          //         //
+          //         // }else{
+          //         //   return Text("Wait");
+          //         // }
+          //         //
+          //         // }),
+          //
+          //
+          //       ],
+          //     ),
+          //   ),
+          // ),
+          // AudioPlayerWidgetButtonOnly(file: widget.link,),
+        ],
+      ),)) ,
+    );
+    //&& snapshot.connectionState == ConnectionState.active
+    // Center(
+    //   child: StreamBuilder<WaveformProgress>(
+    //       stream: progressStream.listen,
+    //       builder: (BuildContext context, AsyncSnapshot<WaveformProgress> snapshot) {
+    //         if(snapshot.hasData){
+    //           return Text( (100 * snapshot.data!.progress).toInt().toString());
+    //         }else{
+    //           return Container(height: 0,width: 0,);
+    //         }
+    //       }),
+    // );
+
+    //ffmpeg -i input -filter_complex "showwavespic=s=640x120" -frames:v 1 output.png
+
+  }
+}
+
 
 class AudioWaveformWidget extends StatefulWidget {
   final Color waveColor;
@@ -1037,10 +1888,10 @@ class AudioWaveformWidget extends StatefulWidget {
     required this.waveform,
     required this.start,
     required this.duration,
-    this.waveColor = Colors.blue,
-    this.scale = 1.0,
+    this.waveColor = Colors.white,
+    this.scale = 10.0,
     this.strokeWidth = 1.0,
-    this.pixelsPerStep = 1.0,
+    this.pixelsPerStep = 2,
   }) : super(key: key);
 
   @override
@@ -1384,8 +2235,7 @@ class _AudioPlayerWidgetLiveAudioState extends State<AudioPlayerWidgetLiveAudio>
 
 class AudioPlayerWidgetButtonOnly extends StatefulWidget {
   String file;
-  Widget grap;
-  AudioPlayerWidgetButtonOnly({required this.file,required this.grap});
+  AudioPlayerWidgetButtonOnly({required this.file,});
   AudioPlayer advancedPlayer = AudioPlayer();
   bool isPlaying = false;
 
@@ -1403,12 +2253,21 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
 
   }
   @override
+  void dispose() {
+
+    widget. advancedPlayer.stop();
+    widget.advancedPlayer.dispose();
+    super.dispose();
+  }
+  @override
   void initState() {
     // TODO: implement initState
     super.initState();
     playerStateManagement();
+    //widget. advancedPlayer
     //initAudio(filePath: widget.file);
   }
+
   @override
   Widget build(BuildContext context) {
 
@@ -1436,20 +2295,18 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
       if(int.parse(sec_)<10)sec_ = "0"+sec_;
       return min_+":"+sec_;
     }
-    return   Column(
+    return   Column(mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(height: 60,child: Center(child: Text("Playback",style: TextStyle(fontSize: 18,color: Colors.black,fontWeight: FontWeight.bold),)),),
-        Container(height: 0.5,color: Colors.black,),
-        Container(height: 300,width: MediaQuery.of(context).size.width,child: Stack(
+        Container(height: 100,width: MediaQuery.of(context).size.width,child: Stack(
           children: [
-            Align(alignment: Alignment.center,child: widget.grap,),
+            //Align(alignment: Alignment.center,child: widget.grap,),
             Align(alignment: Alignment.center,child: Opacity(opacity: 0.3,
               child: StreamBuilder<Duration>(
                   stream:  widget.advancedPlayer.onAudioPositionChanged,
                   builder: (context, snapshot) {
                     if(snapshot.hasData){
-                      if(snapshot.data == durationSecond)return   LinearProgressIndicator(minHeight: 300,color: Colors.blue.withOpacity(0.5),value: 0,);
-                      else  return LinearProgressIndicator(minHeight: 300,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inMilliseconds/(durationSecond*1000),);
+                      if(snapshot.data == durationSecond)return   LinearProgressIndicator(minHeight: 100,color: Colors.blue.withOpacity(0.5),value: 0,);
+                      else  return LinearProgressIndicator(minHeight: 100,color: Colors.blue.withOpacity(0.5),value: snapshot.data!.inMilliseconds/(durationSecond*1000),);
                       return Text(snapshot.data!.inSeconds.toString());
 
                     }else{
@@ -1555,13 +2412,13 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
 
       widget.advancedPlayer.onDurationChanged.listen((Duration d) {
         print('Max duration: $d');
-        setState(() =>  durationSecond = d.inSeconds);
+       if(mounted) setState(() =>  durationSecond = d.inSeconds);
       });
 
 
       widget.advancedPlayer.onAudioPositionChanged.listen((Duration  p) => {
 
-        setState(() => currrentPosition = p.inSeconds)
+        if(mounted) setState(() => currrentPosition = p.inSeconds)
       });
 
       // widget.advancedPlayer.getDuration().then((value) {
@@ -1582,3 +2439,309 @@ class _AudioPlayerWidgetButtonOnlyState extends State<AudioPlayerWidgetButtonOnl
 
   }
 }
+
+
+class Oneproject extends StatefulWidget {
+  QueryDocumentSnapshot queryDocumentSnapshot ;
+  Oneproject({required this.queryDocumentSnapshot});
+  FirebaseAuth auth = FirebaseAuth.instance;
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  String currentrecordingFilePath = "";
+  bool isProcessing = false;
+
+
+  @override
+  _OneprojectState createState() => _OneprojectState();
+}
+
+class _OneprojectState extends State<Oneproject> {
+  firebase_storage.FirebaseStorage storage = firebase_storage.FirebaseStorage.instance;
+
+  bool recording = false;
+  @override
+  Widget build(BuildContext context) {
+
+    return SafeArea(child:Scaffold(body: Stack(
+      children: [
+        Positioned(bottom: 0,right: 0,left: 0,child: Container(height: 60,child: Row(mainAxisAlignment: MainAxisAlignment.center,crossAxisAlignment: CrossAxisAlignment.center,children: [
+          Card(elevation: 5,color: Colors.redAccent,shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(27.5),
+          ),
+            child: Container(height: 55,width: 55,
+              child: Center(
+                child: IconButton(onPressed: (){
+                showModalBottomSheet(
+                context: context,
+                builder: (context) {
+                  return Scaffold(body: Padding(
+                    padding: const EdgeInsets.only(top: 15,left: 10,right: 10,bottom: 10),
+                    child: Column(
+                      children: [
+                        Text("Loops",style: ,),
+                      ],
+                    ),
+                  ),);
+                  return Container(height: MediaQuery.of(context).size.height*0.8,
+                   width: MediaQuery.of(context).size.width,child: Column(
+                      children: [
+
+                      ],
+                    ),
+                  );
+                });
+
+
+
+                },icon: Icon(Icons.music_note,color: Colors.white, ),),
+              ),
+            ),
+          ),
+          Card(elevation: 5,color: Colors.redAccent,shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(27.5),
+          ),
+            child: Container(height: 55,width: 55,
+              child: Center(
+                child: MicForProject(projectId: widget.queryDocumentSnapshot.id,),
+              ),
+            ),
+          ),
+        ],),)),
+        Positioned(top: 0,right:0,left: 0,bottom: 60,child: Scaffold(appBar: AppBar(actions: [
+
+          IconButton(onPressed: (){
+            widget.queryDocumentSnapshot.reference.delete();
+            Navigator.pop(context);
+          }, icon: Icon(Icons.delete))
+        ],title: Text(widget.queryDocumentSnapshot.get("title")),),body:  StreamBuilder<QuerySnapshot>(
+            stream: widget.firestore.collection("projects").doc(widget.queryDocumentSnapshot.id).collection("tracks").orderBy("time",descending: true).snapshots(),
+            builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+              if(snapshot.hasData && snapshot.data!.docs.length>0){
+                return Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: snapshot.data!.docs.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        Future<String> downloadFile({required String link})async{
+                          var url = Uri.parse(snapshot.data!.docs[index].get("wave"));
+                          var response = await http.get(url);
+                          Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+                          String appDocumentsPath = appDocumentsDirectory.path; // 2
+                          String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName").toString().replaceAll("mp3", "wave");
+                          File file = File(filePath);
+                          await file.writeAsBytes(response.bodyBytes);
+                          return filePath;
+
+                        }
+                        return  FutureBuilder<String>(
+                          future: downloadFile(link: snapshot.data!.docs[index].get("file")), // async work
+                          builder: (BuildContext context, AsyncSnapshot<String> snapshotW) {
+                            switch (snapshotW.connectionState) {
+                              case ConnectionState.done:
+                                return InkWell(onTap: (){
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(wave: snapshotW.data!,link:  snapshot.data!.docs[index].get("file"),width: MediaQuery.of(context).size.width)),
+                                  );
+                                },child: SingleAudioGraph(link: snapshotW.data!,));
+                              default:
+                                if (snapshot.hasError)
+                                  return Text('Error: ${snapshot.error}');
+                                else
+                                  return Container(height: 0,width: 0,);
+                                return Text('Result: ${snapshot.data}');
+                            }
+                          },
+                        );
+
+                        return SingleAudioGraph(link: "",);
+                        return   ListTile(onTap: () async {
+
+
+                          var url = Uri.parse(snapshot.data!.docs[index].get("file"));
+                          var response = await http.get(url);
+                          Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
+                          String appDocumentsPath = appDocumentsDirectory.path; // 2
+                          String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName");
+                          File file = File(filePath);
+                          await file.writeAsBytes(response.bodyBytes);
+
+
+                          // Navigator.push(
+                          //   context,
+                          //   MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(link: file.path,width: MediaQuery.of(context).size.width)),
+                          // );
+
+
+                        },leading: AudioPlayerWidgetLiveAudio(file: snapshot.data!.docs[index].get("file"),),trailing: IconButton(icon: Icon(Icons.download),onPressed: () async {
+                          var url = Uri.parse(snapshot.data!.docs[index].get("file"));
+                          var response = await http.get(url);
+                          Directory appDocumentsDirectory = await getApplicationDocumentsDirectory(); // 1
+                          String appDocumentsPath = appDocumentsDirectory.path; // 2
+                          String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName");
+                          File file = File(filePath);
+                          await file.writeAsBytes(response.bodyBytes);
+
+
+
+                        },),subtitle: Text(snapshot.data!.docs[index].get("email")),title: Text( snapshot.data!.docs[index].get("fileName")),);
+
+                      }),
+                );
+
+              }else{
+                return Center(child: Text("No Tracks"),);
+              }
+
+            }),),)
+      ],
+    ),));
+  }
+}
+
+
+class MicForProject extends StatefulWidget {
+  bool isProcessing = false;
+  Record record = Record();
+  String projectId;
+  FirebaseAuth auth = FirebaseAuth.instance;
+  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  String currentrecordingFilePath = "";
+  MicForProject({required this.projectId});
+
+  @override
+  _MicForProjectState createState() => _MicForProjectState();
+}
+
+class _MicForProjectState extends State<MicForProject> {
+  bool recording = false;
+  firebase_storage.FirebaseStorage storage = firebase_storage.FirebaseStorage.instance;
+  @override
+  void dispose() {
+
+    widget.record.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return widget.isProcessing==false? IconButton(icon: Icon(recording?Icons.stop: Icons.fiber_manual_record,color: Colors.white,),onPressed: ()async{
+      if(recording){
+        if(await widget.record.isRecording())
+          widget.record.stop().then((value) {
+            widget.record.dispose();
+            widget.record = Record();
+
+
+
+            print(value);
+            setState(() {
+              recording = !recording;
+
+
+            });
+            Future.delayed(Duration(seconds: 1)).then((value) async {
+
+              String path =await localPath();
+              String  waveFile = path+"/"+DateTime.now().millisecondsSinceEpoch.toString()+'waveform.wave';
+              print(waveFile);
+              setState(() {
+                widget.isProcessing = true;
+              });
+
+
+              Stream<WaveformProgress> progressStream = JustWaveform.extract(
+                audioInFile: File(widget.currentrecordingFilePath),
+                waveOutFile: File(waveFile),
+                zoom: const WaveformZoom.pixelsPerSecond(100),
+              );
+
+              progressStream.listen((waveformProgress) {
+
+                print('Progress: %${(100 * waveformProgress.progress).toInt()}');
+                if (waveformProgress.waveform != null) {
+
+                  //  Waveform? waveform  = waveformProgress.waveform;
+                  // Use the waveform.
+                  print("use waveform");
+
+                  firebase_storage.Reference refWave = storage.ref(widget.auth.currentUser!.uid+"/"+waveFile.split('/').last);
+                  //firebase_storage.Reference ref = storage.ref(fileName);
+
+                  refWave.putFile(File(waveFile)).then((valW) {
+                    //await  ref.putFile(File(allPHotos[i]["imagePath"]));
+
+                    refWave.getDownloadURL().then((valueWaveFile) {
+                      // String link = await ref.getDownloadURL();
+                      print("wave uploaded");
+
+
+                      firebase_storage.Reference ref = storage.ref(widget.auth.currentUser!.uid+"/"+widget.currentrecordingFilePath.split('/').last);
+                      //firebase_storage.Reference ref = storage.ref(fileName);
+
+                      ref.putFile(File(widget.currentrecordingFilePath)).then((val) {
+                        //await  ref.putFile(File(allPHotos[i]["imagePath"]));
+
+                        ref.getDownloadURL().then((value) {
+                          // String link = await ref.getDownloadURL();
+                          print("audio uploaded");
+                          // print(link);
+                          setState(() {
+                            widget.isProcessing = false;
+                          });
+                          widget.firestore
+                              .collection("projects")
+                              .doc(widget.projectId).collection("tracks").add({"time":DateTime.now().millisecondsSinceEpoch,"file":value,"wave":valueWaveFile,"email":widget.auth.currentUser!.email,"fileName":widget.currentrecordingFilePath.split('/').last,"uid":widget.auth.currentUser!.uid});
+                        });
+
+
+                      });
+
+
+
+
+
+                    });
+
+
+                  });
+
+
+
+                }
+              });
+
+
+
+
+
+
+
+
+            });
+          });
+      }else{
+        bool result = await widget.record.hasPermission();
+        if(result) {
+          String path =await localPath();
+          setState(() {
+            recording = !recording;
+
+
+          });
+          widget.currentrecordingFilePath =  path+"/"+DateTime.now().millisecondsSinceEpoch.toString()+".mp3";
+          await widget.record.start(
+            path:widget.currentrecordingFilePath, // required
+            encoder: AudioEncoder.AMR_NB, // by default
+            bitRate: 128000, // by default
+          );
+        }
+      }
+
+
+
+    },):CircularProgressIndicator(color: Colors.blue,);
+  }
+}
+
+
+
