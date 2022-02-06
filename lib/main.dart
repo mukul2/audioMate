@@ -22,7 +22,7 @@ void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Color(0xFF4A235A)
+      statusBarColor: Color(0xFF36004C)
   ));
   runApp(const MyApp());
 }
@@ -35,8 +35,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
-      theme: ThemeData(scaffoldBackgroundColor: const Color(0xFF4A235A),appBarTheme: AppBarTheme(elevation: 1,
-        backgroundColor: Color(0xFF4A235A),
+      theme: ThemeData(scaffoldBackgroundColor: const Color(0xFF36004C),appBarTheme: AppBarTheme(elevation: 1,
+        backgroundColor: Color(0xFF36004C),
       ),
         textTheme:Theme.of(context).textTheme.apply(
           bodyColor: Colors.white,
@@ -621,12 +621,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
                    },leading: AudioPlayerWidgetLiveAudio(file: snapshot.data!.docs[index].get("link"),),trailing: IconButton(icon: Icon(Icons.download),onPressed: () async {
                      var url = Uri.parse(snapshot.data!.docs[index].get("link"));
-                     var response = await http.get(url);
+
+
                      Directory appDocumentsDirectory = await getApplicationDocumentsDirectory(); // 1
                      String appDocumentsPath = appDocumentsDirectory.path; // 2
                      String filePath = '$appDocumentsPath/'+snapshot.data!.docs[index].get("fileName");
-                     File file = File(filePath);
-                     await file.writeAsBytes(response.bodyBytes);
+
+                     if(await File(filePath).exists()){
+
+                     }else{
+                       var response = await http.get(url);
+
+                       File file = File(filePath);
+                       await file.writeAsBytes(response.bodyBytes);
+                     }
+
+
                      _listofFiles();
 
                      
@@ -2509,25 +2519,60 @@ class _OneprojectState extends State<Oneproject> {
   firebase_storage.FirebaseStorage storage = firebase_storage.FirebaseStorage.instance;
 
   bool recording = false;
+  bool showGrid = false;
   List<AudioPlayer>allAudioOnly = [];
   List<int>allDelay = [];
+  int maxMusicIndex = 0 ;
+  int maxMusicIndexHelper = 0 ;
   @override
   Widget build(BuildContext context) {
     double width =  MediaQuery.of(context).size.width;
 
-    return SafeArea(child:Scaffold(body: Stack(
+    return SafeArea(child:Scaffold(appBar: AppBar(actions: [
+
+      IconButton(onPressed: (){
+        widget.queryDocumentSnapshot.reference.delete();
+        Navigator.pop(context);
+      }, icon: Icon(Icons.delete))
+    ],title: Text(widget.queryDocumentSnapshot.get("title")),),body: Stack(
       children: [
         Positioned(bottom: 0,right: 0,left: 0,child: Container(height: 60,child: Row(mainAxisAlignment: MainAxisAlignment.center,crossAxisAlignment: CrossAxisAlignment.center,children: [
 
+          Card(elevation: 5,color: showGrid? Colors.redAccent:Colors.grey,shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(27.5),
+          ),
+            child: Container(height: 55,width: 55,
+              child: Center(
+                child: IconButton(onPressed: (){
+                  setState(() {
+                    showGrid = !showGrid;
+                  });
+
+
+
+
+                },icon: Icon(Icons.grid_on,color: Colors.white, ),),
+              ),
+            ),
+          ),
+
+    StreamBuilder(
+    stream: allAudioOnly[maxMusicIndex].onPlayerStateChanged,
+    builder: (BuildContext context, AsyncSnapshot<PlayerState> snapshot) {}),
           Card(elevation: 5,color: Colors.redAccent,shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(27.5),
           ),
+            //allAudioOnly[maxMusicIndex].
             child: Container(height: 55,width: 55,
               child: Center(
                 child: IconButton(onPressed: (){
                   print("delays");
                   if(allAudioOnly.length>0){
                     print(allDelay);
+
+
+                    //maxLenght
+
                     for(int i = 0 ; i < allAudioOnly.length ; i++){
                       Future.delayed(Duration(milliseconds: allDelay[i])).then((value) {
                         allAudioOnly[i].resume();
@@ -2638,21 +2683,21 @@ class _OneprojectState extends State<Oneproject> {
             ),
           ),
         ],),)),
-        Positioned(top: 0,right:0,left: 0,bottom: 60,child: Scaffold(appBar: AppBar(actions: [
-
-          IconButton(onPressed: (){
-            widget.queryDocumentSnapshot.reference.delete();
-            Navigator.pop(context);
-          }, icon: Icon(Icons.delete))
-        ],title: Text(widget.queryDocumentSnapshot.get("title")),),body:  FutureBuilder<QuerySnapshot>(
+        Align(alignment: Alignment.center,child: FutureBuilder<QuerySnapshot>(
             future: widget.firestore.collection("projects").doc(widget.queryDocumentSnapshot.id).collection("tracks").orderBy("time",descending: true).get(),
             builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+
+
+
+
 
               if(snapshot.hasData && snapshot.data!.docs.length>0){
                 allAudioOnly.clear();
                 int maxLenght = 0 ;
                 List<Widget> allAudio = [] ;
                 List<int>allDurations = [];
+                 maxMusicIndex = 0 ;
+                 maxMusicIndexHelper = 0 ;
 
 
                 Future<int>getMusicLenghtOnly({required String link}) async {
@@ -2664,14 +2709,19 @@ class _OneprojectState extends State<Oneproject> {
                   // await  advancedPlayer.setUrl(link);
 
                   Duration dd =  await advancedPlayer.onDurationChanged.first;
-                  if(maxLenght<dd.inMilliseconds) maxLenght = dd.inMilliseconds;
+
+                  if(maxLenght<dd.inMilliseconds){
+                    maxLenght = dd.inMilliseconds;
+                    maxMusicIndex = maxMusicIndexHelper;
+                  };
+                  maxMusicIndexHelper++;
                   return dd.inMilliseconds;
                   return  await advancedPlayer.getDuration();
                   // return d.inMilliseconds;
 
                 }
 
-               Future cacheAllData() async {
+                Future cacheAllData() async {
                   for(int i = 0 ; i < snapshot.data!.docs.length ; i++){
 
                     try{
@@ -2682,11 +2732,11 @@ class _OneprojectState extends State<Oneproject> {
                     }
                     allDelay.add(0);
 
-                   allDurations.add( await getMusicLenghtOnly(link: snapshot.data!.docs[i].get("file")));
-                   if(i+1 == snapshot.data!.docs.length){
-                     MaxDurationFounndStream.getInstance().dataReload(true);
+                    allDurations.add( await getMusicLenghtOnly(link: snapshot.data!.docs[i].get("file")));
+                    if(i+1 == snapshot.data!.docs.length){
+                      MaxDurationFounndStream.getInstance().dataReload(true);
 
-                   }
+                    }
 
 
                   }
@@ -2694,161 +2744,204 @@ class _OneprojectState extends State<Oneproject> {
 
 
                 return  FutureBuilder(
-                future: cacheAllData(), // async work
-                builder: (BuildContext context, AsyncSnapshot snapshotCache) {
-                  if(snapshotCache.connectionState == ConnectionState.done){
-                    for(int j = 0 ; j < snapshot.data!.docs.length ; j++){
-                      Future<String> downloadFile({required String link})async{
-                        var url = Uri.parse(snapshot.data!.docs[j].get("wave"));
-                        var response = await http.get(url);
-                        Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
-                        String appDocumentsPath = appDocumentsDirectory.path; // 2
-                        String filePath = '$appDocumentsPath/'+snapshot.data!.docs[j].get("fileName").toString().replaceAll("mp3", "wave");
-                        File file = File(filePath);
-                        await file.writeAsBytes(response.bodyBytes);
-                        return filePath;
+                    future: cacheAllData(), // async work
+                    builder: (BuildContext context, AsyncSnapshot snapshotCache) {
+                      if(snapshotCache.connectionState == ConnectionState.done){
+                        for(int j = 0 ; j < snapshot.data!.docs.length ; j++){
+                          Future<String> downloadFile({required String link})async{
+                            Directory appDocumentsDirectory = await getApplicationDocumentsDirectory();
 
-                      }
+                            String appDocumentsPath = appDocumentsDirectory.path; // 2
+                            String filePath = '$appDocumentsPath/'+snapshot.data!.docs[j].get("fileName").toString().replaceAll("mp3", "wave");
 
-                      Future<int>getMusicLenght({required String link}) async {
-                        print("called "+link);
-                        AudioPlayer advancedPlayer = AudioPlayer();
+                            if(await File(filePath).exists())return filePath;
 
-                        // await  advancedPlayer.setUrl(link);
-                        advancedPlayer.play(link);
-                        Duration dd =  await advancedPlayer.onDurationChanged.first;
-                        //  if(maxLenght<dd.inMilliseconds) maxLenght = dd.inMilliseconds;
-                        return dd.inMilliseconds;
-                        return  await advancedPlayer.getDuration();
-                        // return d.inMilliseconds;
+                            var url = Uri.parse(snapshot.data!.docs[j].get("wave"));
+                            var response = await http.get(url);
 
+                            File file = File(filePath);
+                            await file.writeAsBytes(response.bodyBytes);
+                            return filePath;
 
+                          }
 
-                      }
-                      allAudio.add( FutureBuilder<String>(
-                        future: downloadFile(link: snapshot.data!.docs[j].get("file")), // async work
-                        builder: (BuildContext context, AsyncSnapshot<String> snapshotW) {
-                          switch (snapshotW.connectionState) {
-                            case ConnectionState.done:
+                          Future<int>getMusicLenght({required String link}) async {
+                            print("called "+link);
+                            AudioPlayer advancedPlayer = AudioPlayer();
 
-                              return InkWell(onTap: (){
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(wave: snapshotW.data!,link:  snapshot.data!.docs[j].get("file"),width: MediaQuery.of(context).size.width)),
-                                );
-                              },child:true?StreamBuilder(
-                                  stream:MaxDurationFounndStream.getInstance().outData,
-                                  builder: (BuildContext context, AsyncSnapshot<bool> snapshotDurationFound) {
-                                    // return Text((MediaQuery.of(context).size.width*((allDurations[j])/maxLenght)).toString());
-                                    //return  Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,));
-
-                                    return Draggablletrack(onTrackPositionChanged: (val){
-                                      print(val["offsetScale"]*maxLenght/1000);
-                                      widget.firestore.collection("projects").doc(widget.queryDocumentSnapshot.id).collection("tracks").doc(snapshot.data!.docs[j].id).update({"delay":(val["offsetScale"]*maxLenght).toInt()});
-
-                                      allDelay[j]=(val["offsetScale"]*maxLenght).toInt();
-                                    },widget: Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,)),width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),starts:(MediaQuery.of(context).size.width)* (allDelay[j]/maxLenght).toDouble(),);
+                            // await  advancedPlayer.setUrl(link);
+                            advancedPlayer.play(link);
+                            Duration dd =  await advancedPlayer.onDurationChanged.first;
+                            //  if(maxLenght<dd.inMilliseconds) maxLenght = dd.inMilliseconds;
+                            return dd.inMilliseconds;
+                            return  await advancedPlayer.getDuration();
+                            // return d.inMilliseconds;
 
 
-                                   return Container(height: 50,color: Colors.redAccent,width:  MediaQuery.of(context).size.width*0.5,);
 
-                                    return Text((MediaQuery.of(context).size.width*allDurations[j]/maxLenght).toString()+" "+MediaQuery.of(context).size.width.toString());
-                                    return  Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,));
+                          }
+                          allAudio.add( FutureBuilder<String>(
+                            future: downloadFile(link: snapshot.data!.docs[j].get("file")), // async work
+                            builder: (BuildContext context, AsyncSnapshot<String> snapshotW) {
+                              switch (snapshotW.connectionState) {
+                                case ConnectionState.done:
 
-                                    if(snapshotDurationFound.hasData){
-                                      return Text((MediaQuery.of(context).size.width*((allDurations[j])/maxLenght)).toString());
-                                      return   Container(width: MediaQuery.of(context).size.width*((allDurations[j])/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+                                  return InkWell(onTap: (){
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) =>  SingleAudioPlayer(wave: snapshotW.data!,link:  snapshot.data!.docs[j].get("file"),width: MediaQuery.of(context).size.width)),
+                                    );
+                                  },child:true?StreamBuilder(
+                                      stream:MaxDurationFounndStream.getInstance().outData,
+                                      builder: (BuildContext context, AsyncSnapshot<bool> snapshotDurationFound) {
+                                        // return Text((MediaQuery.of(context).size.width*((allDurations[j])/maxLenght)).toString());
+                                        //return  Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,));
 
-                                    }else{
-                                      return  Container(width:  MediaQuery.of(context).size.width, child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+                                        return Draggablletrack(onTrackPositionChanged: (val){
+                                          print(val["offsetScale"]*maxLenght/1000);
+                                          widget.firestore.collection("projects").doc(widget.queryDocumentSnapshot.id).collection("tracks").doc(snapshot.data!.docs[j].id).update({"delay":(val["offsetScale"]*maxLenght).toInt()});
 
-                                    }
-                                  }): FutureBuilder<int>(
-                                future: getMusicLenght(link: snapshot.data!.docs[j].get("file")), // async work
-                                builder: (BuildContext context, AsyncSnapshot<int> snapshotD) {
-                                  if(snapshotD.hasData){
-                                    return  StreamBuilder(
-                                        stream:MaxDurationFounndStream.getInstance().outData,
-                                        builder: (BuildContext context, AsyncSnapshot<bool> snapshotDurationFound) {
-                                          if(snapshotDurationFound.hasData){
-                                            return   Container(width: MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+                                          allDelay[j]=(val["offsetScale"]*maxLenght).toInt();
+                                        },widget: Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,)),width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),starts:(MediaQuery.of(context).size.width)* (allDelay[j]/maxLenght).toDouble(),);
 
-                                          }else{
-                                            return  Container(width:  MediaQuery.of(context).size.width, child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
 
-                                          }
-                                        });
-                                    Text(((snapshotD.data!)/maxLenght).toString());
-                                    Container(width:  MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
-                                    return Row(
-                                      children: [
-                                        // Text((snapshotD.data!).toString()),
-                                        StreamBuilder(
+                                        return Container(height: 50,color: Colors.redAccent,width:  MediaQuery.of(context).size.width*0.5,);
+
+                                        return Text((MediaQuery.of(context).size.width*allDurations[j]/maxLenght).toString()+" "+MediaQuery.of(context).size.width.toString());
+                                        return  Container(width:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght), child: SingleAudioGraph(wi:  MediaQuery.of(context).size.width*((allDurations[j])/maxLenght),link: snapshotW.data!,));
+
+                                        if(snapshotDurationFound.hasData){
+                                          return Text((MediaQuery.of(context).size.width*((allDurations[j])/maxLenght)).toString());
+                                          return   Container(width: MediaQuery.of(context).size.width*((allDurations[j])/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+
+                                        }else{
+                                          return  Container(width:  MediaQuery.of(context).size.width, child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+
+                                        }
+                                      }): FutureBuilder<int>(
+                                    future: getMusicLenght(link: snapshot.data!.docs[j].get("file")), // async work
+                                    builder: (BuildContext context, AsyncSnapshot<int> snapshotD) {
+                                      if(snapshotD.hasData){
+                                        return  StreamBuilder(
                                             stream:MaxDurationFounndStream.getInstance().outData,
                                             builder: (BuildContext context, AsyncSnapshot<bool> snapshotDurationFound) {
                                               if(snapshotDurationFound.hasData){
                                                 return   Container(width: MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
 
                                               }else{
-                                                return  Container(width:  MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+                                                return  Container(width:  MediaQuery.of(context).size.width, child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
 
                                               }
-                                            }),
+                                            });
+                                        Text(((snapshotD.data!)/maxLenght).toString());
+                                        Container(width:  MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+                                        return Row(
+                                          children: [
+                                            // Text((snapshotD.data!).toString()),
+                                            StreamBuilder(
+                                                stream:MaxDurationFounndStream.getInstance().outData,
+                                                builder: (BuildContext context, AsyncSnapshot<bool> snapshotDurationFound) {
+                                                  if(snapshotDurationFound.hasData){
+                                                    return   Container(width: MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+
+                                                  }else{
+                                                    return  Container(width:  MediaQuery.of(context).size.width*((snapshotD.data!)/maxLenght) , child: SingleAudioGraph(wi: 10,link: snapshotW.data!,));
+
+                                                  }
+                                                }),
 
 
-                                      ],
-                                    );
-                                    return Text((snapshotD.data!).toString());
-                                  }else{
-                                    return Text("--");
-                                  }
-                                },
-                              ));
-                            default:
-                              if (snapshot.hasError)
-                                return Text('Error: ${snapshot.error}');
-                              else
-                                return Container(height: 0,width: 0,);
-                              return Text('Result: ${snapshot.data}');
-                          }
-                        },
-                      ));
+                                          ],
+                                        );
+                                        return Text((snapshotD.data!).toString());
+                                      }else{
+                                        return Text("--");
+                                      }
+                                    },
+                                  ));
+                                default:
+                                  if (snapshot.hasError)
+                                    return Text('Error: ${snapshot.error}');
+                                  else
+                                    return Container(height: 0,width: 0,);
+                                  return Text('Result: ${snapshot.data}');
+                              }
+                            },
+                          ));
 
-                    }
-                    List<Widget> times = [] ;
-                    List<Widget> rows = [] ;
-                    double height = MediaQuery.of(context).size.height;
-                    for(int l = 0 ; l < (maxLenght/1000).ceilToDouble().toInt() ; l++){
-                      times.add(  Expanded(child: Center(child: Center(child: Text(l.toString())),)));
-                      rows.add(  Expanded(child: Center(child: Center(child: Container(height: height,width: 2,color: Colors.white,)),)));
-                    }
+                        }
+                        List<Widget> times = [] ;
+                        List<Widget> rows = [] ;
+                        double height = MediaQuery.of(context).size.height;
+                        for(int l = 0 ; l < (maxLenght/1000).ceilToDouble().toInt() ; l++){
+                          times.add(  Expanded(child: Center(child: Text((1+l).toString()))));
+                          rows.add(  Expanded( child: Center(child: Container(height: height,width: 2,color: Colors.white,))));
+                        }
 
-                    return Stack(
-                      children: [
-                        Container(margin: EdgeInsets.only(top: 28),
-                          child: Row(
-                            children: rows,
-                          ),
-                        ),
-                        Column(
+
+
+                        return Stack(
                           children: [
-                            Row(
-                              children:times,
+                           if(showGrid) Container(margin: EdgeInsets.only(top: 28,bottom: 60),
+                              child: Row(
+                                children: rows,
+                              ),
                             ),
-                            Container(margin: EdgeInsets.only(top: 10),height: 2,width: double.infinity,color: Colors.white,),
-                            ListView(
-                              shrinkWrap: true,
-                              children: allAudio,
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
+                            if(showGrid)  Column(
+                              children: [
+                                Row(
+                                  children:times,
+                                ),
+                                Container(margin: EdgeInsets.only(top: 10),height: 2,width: double.infinity,color: Colors.white,),
 
-                  }else{
-                    return Center(child: Text("Please wait"),);
-                  }
-                }
+                              ],
+                            ),
+
+                            Align(alignment: Alignment.center,child: Container(height: (allAudio.length*74)+23+8,
+                              child: Stack(
+                                children: [
+                                  Align(alignment: Alignment.bottomCenter,child: ListView(
+                                    shrinkWrap: true,
+                                    children: allAudio,
+                                  ),),
+                                  //allAudioOnly[maxMusicIndex].
+                                  StreamBuilder(
+                                  stream: allAudioOnly[maxMusicIndex].onAudioPositionChanged,
+                                  builder: (BuildContext context, AsyncSnapshot<Duration> snapshot) {
+
+                                  Widget  seekbar(int millis){
+                                    return  Positioned(bottom: 0,left:(( width*millis/(maxLenght))-30)<0?0:( width*millis/(maxLenght))-30,child: Container(width: 50,height: (allAudio.length*74)+23+8,child: Column(
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 0),
+                                            child: Text(getMinute(millis),),
+                                          ),
+                                         Container(width: 10,height: 10,color: Colors.orange,),
+                                         Container(width: 2,height: (allAudio.length*74)+3,color: Colors.white,),
+                                        ],
+                                      ),));
+                                    }
+                                    if(snapshot.hasData)
+                                    return seekbar(snapshot.data!.inMilliseconds);
+                                    else return seekbar(0);
+
+                                  }),
+
+
+
+
+
+                                ],
+                              ),
+                            ),),
+
+                          ],
+                        );
+
+                      }else{
+                        return Center(child: CircularProgressIndicator(),);
+                      }
+                    }
                 );
 
 
@@ -2890,12 +2983,12 @@ class _OneprojectState extends State<Oneproject> {
                           print("called "+link);
                           AudioPlayer advancedPlayer = AudioPlayer();
 
-                        // await  advancedPlayer.setUrl(link);
-                         advancedPlayer.play(link);
+                          // await  advancedPlayer.setUrl(link);
+                          advancedPlayer.play(link);
                           Duration dd =  await advancedPlayer.onDurationChanged.first;
                           return dd.inMilliseconds;
-                         return  await advancedPlayer.getDuration();
-                       // return d.inMilliseconds;
+                          return  await advancedPlayer.getDuration();
+                          // return d.inMilliseconds;
 
 
 
@@ -2976,7 +3069,7 @@ class _OneprojectState extends State<Oneproject> {
                 return Center(child: Text("No Tracks"),);
               }
 
-            }),),)
+            }),)
       ],
     ),));
   }
@@ -3477,4 +3570,16 @@ class _DraggablletrackState extends State<Draggablletrack> {
       Positioned(left: widget.starts,child: Container(width: widget.width,child: widget.widget,))
     ],);
   }
+}
+String  getMinute(int min){
+  double min_ = 0;
+  double sec_ =0;
+  String mm= "";
+  String ss= "";
+ // min_ = (min/60000);
+  sec_ = (min/1000);
+  if(min_<10)mm = "0"+min_.toStringAsFixed(0);
+  if(sec_<10)ss = sec_.toStringAsFixed(2);
+  return ss;
+  return mm+":"+ss;
 }
