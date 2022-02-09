@@ -2556,9 +2556,7 @@ class _OneprojectState extends State<Oneproject> {
             ),
           ),
 
-    StreamBuilder(
-    stream: allAudioOnly[maxMusicIndex].onPlayerStateChanged,
-    builder: (BuildContext context, AsyncSnapshot<PlayerState> snapshot) {}),
+
           Card(elevation: 5,color: Colors.redAccent,shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(27.5),
           ),
