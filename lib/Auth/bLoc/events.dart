@@ -1,0 +1,11 @@
+enum loginEvents {loginFailed,
+  loginButtonPressed,
+  loginButtonBusy,
+  loginButtonFree,
+  passwordreset,
+  privacypolicy,
+  qrscan,
+  emailFieldvalidated,
+  passwordFieldValidated,
+  emailFieldInvalidated,
+  passwordFieldInValidated}
